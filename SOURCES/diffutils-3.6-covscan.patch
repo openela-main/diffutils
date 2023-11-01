@@ -1,0 +1,74 @@
+diff -up diffutils-3.6/lib/quotearg.c.covscan diffutils-3.6/lib/quotearg.c
+--- diffutils-3.6/lib/quotearg.c.covscan	2017-05-20 02:14:05.000000000 +0200
++++ diffutils-3.6/lib/quotearg.c	2018-08-13 14:20:54.934196535 +0200
+@@ -886,8 +886,9 @@ quotearg_n_options (int n, char const *a
+   if (nslots <= n)
+     {
+       bool preallocated = (sv == &slotvec0);
+-
+-      if (MIN (INT_MAX, MIN (PTRDIFF_MAX, SIZE_MAX) / sizeof *sv) <= n)
++      int nmax = MIN (INT_MAX, MIN (PTRDIFF_MAX, SIZE_MAX) / sizeof *sv) - 1;
++      
++      if (nmax < n)
+         xalloc_die ();
+ 
+       slotvec = sv = xrealloc (preallocated ? NULL : sv, (n + 1) * sizeof *sv);
+diff -up diffutils-3.6/src/diff.h.covscan diffutils-3.6/src/diff.h
+--- diffutils-3.6/src/diff.h.covscan	2018-08-13 14:20:54.931196520 +0200
++++ diffutils-3.6/src/diff.h	2018-08-13 14:20:54.935196541 +0200
+@@ -392,7 +392,7 @@ extern void print_sdiff_script (struct c
+ extern char const change_letter[4];
+ extern char const pr_program[];
+ extern char *concat (char const *, char const *, char const *);
+-extern bool (*lines_differ) (char const *, size_t, char const *, size_t) _GL_ATTRIBUTE_PURE;
++extern bool (*lines_differ) (char const *, size_t, char const *, size_t);
+ extern bool lines_differ_singlebyte (char const *, size_t, char const *, size_t) _GL_ATTRIBUTE_PURE;
+ #ifdef HANDLE_MULTIBYTE
+ extern bool lines_differ_multibyte (char const *, size_t, char const *, size_t) _GL_ATTRIBUTE_PURE;
+diff -up diffutils-3.6/src/ifdef.c.covscan diffutils-3.6/src/ifdef.c
+--- diffutils-3.6/src/ifdef.c.covscan	2017-05-18 19:39:59.000000000 +0200
++++ diffutils-3.6/src/ifdef.c	2018-08-13 14:20:54.935196541 +0200
+@@ -362,20 +362,14 @@ do_printf_spec (FILE *out, char const *s
+ 	    printint print_value = value;
+ 	    size_t spec_prefix_len = f - spec - 2;
+ 	    size_t pI_len = sizeof pI - 1;
+-#if 0
+-	    char format[spec_prefix_len + pI_len + 2];
+-#else
+ 	    char *format = xmalloc (spec_prefix_len + pI_len + 2);
+-#endif
+ 	    char *p = format + spec_prefix_len + pI_len;
+ 	    memcpy (format, spec, spec_prefix_len);
+ 	    memcpy (format + spec_prefix_len, pI, pI_len);
+ 	    *p++ = c;
+ 	    *p = '\0';
+ 	    fprintf (out, format, print_value);
+-#if ! HAVE_C_VARARRAYS
+ 	    free (format);
+-#endif
+ 	  }
+       }
+       break;
+diff -up diffutils-3.6/src/sdiff.c.covscan diffutils-3.6/src/sdiff.c
+--- diffutils-3.6/src/sdiff.c.covscan	2018-08-13 14:41:13.969450849 +0200
++++ diffutils-3.6/src/sdiff.c	2018-08-13 14:44:07.877344103 +0200
+@@ -230,8 +230,10 @@ cleanup (int signo __attribute__((unused
+   if (0 < diffpid)
+     kill (diffpid, SIGPIPE);
+ #endif
+-  if (tmpname)
++  if (tmpname) {
+     unlink (tmpname);
++    free (tmpname);
++  }
+ }
+ 
+ static void exiterr (void) __attribute__((noreturn));
+@@ -685,6 +687,7 @@ main (int argc, char *argv[])
+ 	if (tmpname)
+ 	  {
+ 	    unlink (tmpname);
++	    free (tmpname);
+ 	    tmpname = 0;
+ 	  }
+ 
