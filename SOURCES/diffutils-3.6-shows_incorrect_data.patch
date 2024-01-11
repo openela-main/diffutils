@@ -1,0 +1,45 @@
+commit ffd63aedad3c0eb08ebb27103e5f242f8732dc0c
+Author: Paul Eggert <eggert@cs.ucla.edu>
+Date:   Tue Jul 24 10:18:28 2018 -0700
+
+    cmp: fix bug in -b diagnostic
+    
+    Problem reported by mancha (Bug#32249).
+    * src/cmp.c (count_newlines): Restore old value of sentinel.
+    * tests/cmp: Test for the bug.
+
+diff --git a/src/cmp.c b/src/cmp.c
+index 04638e3..2811392 100644
+--- a/src/cmp.c
++++ b/src/cmp.c
+@@ -639,9 +639,11 @@ count_newlines (char *buf, size_t bufsize)
+   size_t count = 0;
+   char *p;
+   char *lim = buf + bufsize;
++  char ch = *lim;
+   *lim = '\n';
+   for (p = buf; (p = rawmemchr (p, '\n')) != lim; p++)
+     count++;
++  *lim = ch;
+   return count;
+ }
+ 
+diff --git a/tests/cmp b/tests/cmp
+index 160c1ea..ca0fe5e 100755
+--- a/tests/cmp
++++ b/tests/cmp
+@@ -208,4 +208,14 @@ done >out1
+ 
+ compare exp1 out1 || fail=1
+ 
++printf 'bad\n' >bad
++printf 'bug\n' >bug
++echo LC_ALL=C cmp -b bad bug
++LC_ALL=C cmp -b bad bug
++test $? -eq 1 || fail=1
++case `LC_ALL=C cmp -b bad bug` in
++  'bad bug differ: byte 2, line 1 is '*' a '*' u') ;;
++  *) echo 'expected cmp -b to report a and u'; fail=1;;
++esac
++
+ Exit $fail
